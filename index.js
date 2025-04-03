@@ -116,8 +116,25 @@ app.get('/report', async (req, res) => {
   }
 });
 
-app.listen(PORT, LISTEN_IP, () => {
-  console.log(`API running on http://${LISTEN_IP}:${PORT}`);
-  console.log(`Mount point: ${MOUNT_POINT}`);
-  console.log('Authentication is enabled - requests require ?secret=KEY');
+async function initializeQuotaFiles() {
+  try {
+    // Check if files exist, create them if they don't
+    await Promise.all([
+      fs.access('/etc/projects').catch(() => fs.writeFile('/etc/projects', '')),
+      fs.access('/etc/projid').catch(() => fs.writeFile('/etc/projid', ''))
+    ]);
+    console.log('Quota system files verified/initialized');
+  } catch (err) {
+    console.error('Failed to initialize quota files:', err);
+    process.exit(1); // Exit if we can't initialize properly
+  }
+}
+
+// Initialize files when starting up
+initializeQuotaFiles().then(() => {
+  app.listen(PORT, LISTEN_IP, () => {
+    console.log(`API running on http://${LISTEN_IP}:${PORT}`);
+    console.log(`Mount point: ${MOUNT_POINT}`);
+    console.log('Authentication is enabled - requests require ?secret=KEY');
+  });
 });
