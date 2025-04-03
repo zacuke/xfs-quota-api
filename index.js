@@ -10,6 +10,7 @@ app.use(express.json());
 const PORT = process.env.PORT ;
 const MOUNT_POINT = process.env.MOUNT_POINT;
 const SECRET_KEY = process.env.SECRET_KEY;
+const LISTEN_IP = process.env.LISTEN_IP;
 
 // --- Authentication Middleware ---
 function authenticate(req, res, next) {
@@ -115,8 +116,8 @@ app.get('/report', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`API running on http://localhost:${PORT}`);
+app.listen(PORT, LISTEN_IP, () => {
+  console.log(`API running on http://${LISTEN_IP}:${PORT}`);
   console.log(`Mount point: ${MOUNT_POINT}`);
   console.log('Authentication is enabled - requests require ?secret=KEY');
 });
