@@ -1,13 +1,17 @@
 const express = require('express');
 const fs = require('fs').promises;
 const { exec } = require('child_process');
+const { Mutex } = require('async-mutex');
 const app = express();
 require('dotenv').config();
 
+// Create a mutex for handling concurrent requests
+const mutex = new Mutex();
+
 app.use(express.json());
 
-// Get configuration from environment variables 
-const PORT = process.env.PORT ;
+// Get configuration from environment variables
+const PORT = process.env.PORT;
 const MOUNT_POINT = process.env.MOUNT_POINT;
 const SECRET_KEY = process.env.SECRET_KEY;
 const LISTEN_IP = process.env.LISTEN_IP;
@@ -15,15 +19,12 @@ const LISTEN_IP = process.env.LISTEN_IP;
 // --- Authentication Middleware ---
 function authenticate(req, res, next) {
   const providedKey = req.query.secret;
-  
   if (!providedKey) {
     return res.status(401).json({ error: 'Secret key is required' });
   }
-  
   if (providedKey !== SECRET_KEY) {
     return res.status(403).json({ error: 'Invalid secret key' });
   }
-  
   next();
 }
 
@@ -81,8 +82,9 @@ function execPromise(command) {
 
 // --- API Endpoints ---
 
-// 1. Add a customer
+// 1. Add a customer (protected by mutex)
 app.post('/customers', async (req, res) => {
+  const release = await mutex.acquire();
   try {
     const { customer } = req.body;
     if (!customer) throw new Error('Missing customer name');
@@ -90,11 +92,14 @@ app.post('/customers', async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  } finally {
+    release();
   }
 });
 
-// 2. Update quota
+// 2. Update quota (protected by mutex)
 app.post('/customers/:customer/quota', async (req, res) => {
+  const release = await mutex.acquire();
   try {
     const { customer } = req.params;
     const { size } = req.body;
@@ -103,16 +108,21 @@ app.post('/customers/:customer/quota', async (req, res) => {
     res.json({ customer, size });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  } finally {
+    release();
   }
 });
 
-// 3. Get quota report (raw xfs_quota output)
+// 3. Get quota report (protected by mutex)
 app.get('/report', async (req, res) => {
+  const release = await mutex.acquire();
   try {
     const report = await execPromise(`xfs_quota -x -c "report -p" ${MOUNT_POINT}`);
     res.send(report);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  } finally {
+    release();
   }
 });
 
